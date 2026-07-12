@@ -1,0 +1,63 @@
+pipeline {
+
+    agent any
+
+    environment {
+        AWS_REGION = "ap-south-1"
+        ECR_REPO = "springboot-demo"
+        IMAGE_TAG = "latest"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                url: 'https://github.com/r-ashwin-07/Project-3.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('SonarQube Scan') {
+            steps {
+                sh 'mvn sonar:sonar'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh 'docker build -t springboot-demo .'
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                sh '''
+                aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 316135158242.dkr.ecr.ap-south-1.amazonaws.com
+
+                docker tag springboot-demo:latest 316135158242.dkr.ecr.ap-south-1.amazonaws.com/springboot-demo:latest
+
+                docker push 316135158242.dkr.ecr.ap-south-1.amazonaws.com/springboot-demo:latest
+                '''
+            }
+        }
+
+        stage('Deploy ECS') {
+            steps {
+                sh '''
+                aws ecs update-service \
+                --cluster demo-cluster \
+                --service demo-service \
+                --force-new-deployment
+                '''
+            }
+        }
+
+    }
+
+}
